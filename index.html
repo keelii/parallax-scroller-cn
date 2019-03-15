@@ -17,38 +17,98 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/4.5.0/pixi.min.js"></script>
 
     <script>
-    
-    function init() {
-        stage = new PIXI.Container()
-        renderer = PIXI.autoDetectRenderer(512, 384,
-            { view: document.getElementById('game-canvas') }
-        )
+    class Far extends PIXI.extras.TilingSprite {
+        static DELTA_X = 0.128
+        constructor(texture, width, height) {
+            super(PIXI.Texture.fromImage('resources/bg-far.png'), 512, 256)
 
-        var farTexture = PIXI.Texture.fromImage('resources/bg-far.png')
-        far = new PIXI.extras.TilingSprite(farTexture, 512, 256)
-        far.position.x = 0
-        far.position.y = 0
-        far.tilePosition.x = 0
-        far.tilePosition.y = 0
-        stage.addChild(far)
+            this.position.x = 0
+            this.position.y = 0
+            this.tilePosition.x = 0
+            this.tilePosition.y = 0
 
-        var midTexture = PIXI.Texture.fromImage("resources/bg-mid.png");
-        mid = new PIXI.extras.TilingSprite(midTexture, 512, 256)
-        mid.position.x = 0;
-        mid.position.y = 128;
-        mid.tilePosition.x = 0
-        mid.tilePosition.y = 0
-        stage.addChild(mid);
-
-        requestAnimationFrame(update)
+            this.viewportX = 0
+        }
+        // update() {
+        //     this.tilePosition.x -= 0.128
+        // }
+        setViewportX(newX) {
+            var distanceTravelled = newX - this.viewportX
+            this.viewportX = newX
+            this.tilePosition.x -= (distanceTravelled * Far.DELTA_X)
+        }
     }
-    function update() {
-        far.tilePosition.x -= 0.128
-        mid.tilePosition.x -= 0.64;
+    class Mid extends PIXI.extras.TilingSprite {
+        static DELTA_X = 0.64
+        constructor(texture, width, height) {
+            super(PIXI.Texture.fromImage('resources/bg-mid.png'), 512, 256)
+            
+            this.position.x = 0
+            this.position.y = 128;
+            this.tilePosition.x = 0
+            this.tilePosition.y = 0
 
-        renderer.render(stage)
+            this.viewportX = 0
+        }
+        // update() {
+        //     this.tilePosition.x -= 0.64;
+        // }
+        setViewportX(newX) {
+            var distanceTravelled = newX - this.viewportX
+            this.viewportX = newX
+            this.tilePosition.x -= (distanceTravelled * Mid.DELTA_X)
+        }
+    }    
 
-        requestAnimationFrame(update)
+    class Scroller {
+        constructor(stage) {
+            this.far = new Far()
+            stage.addChild(this.far)
+
+            this.mid = new Mid()
+            stage.addChild(this.mid)
+
+            this.viewportX = 0
+        }
+        // update() {
+        //     this.far.update()
+        //     this.mid.update()
+        // }
+        setViewportX(x) {
+            this.viewportX = x
+            this.far.setViewportX(x)
+            this.mid.setViewportX(x)
+        }
+        getViewportX() {
+            return this.viewportX
+        }
+        moveViewportBy(units) {
+            var newViewportX = this.viewportX + units
+            this.setViewportX(newViewportX)
+        }
+    }
+
+    class Main {
+        static SCROLL_SPEED = 5
+        constructor() {
+            this.stage = new PIXI.Container()
+            this.renderer = PIXI.autoDetectRenderer(512, 384,
+                { view: document.getElementById('game-canvas') }
+            )
+
+            this.scroller = new Scroller(this.stage)
+
+            requestAnimationFrame(this.update.bind(this))
+        }
+        update() {
+            this.scroller.moveViewportBy(Main.SCROLL_SPEED)
+            this.renderer.render(this.stage)
+            requestAnimationFrame(this.update.bind(this))
+        }
+    }
+
+    function init() {
+        main = new Main()
     }
     </script>
 
