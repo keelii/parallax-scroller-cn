@@ -88,6 +88,130 @@
         }
     }
 
+    class WallSpritesPool {
+        constructor() {
+            this.createWindows()
+            this.createDecorations()
+            this.createHeadEdges()
+            this.createTailEdges()
+            this.createSteps()
+        }
+        borrowWindow() {
+            return this.windows.shift()
+        }
+        returnWindow(sprite) {
+            this.windows.push(sprite)
+        }
+        createWindows() {
+            this.windows = []
+
+            this.addWindowSprites(6, 'window_01')
+            this.addWindowSprites(6, 'window_02')
+
+            this.shuffle(this.windows)
+        }
+        addWindowSprites(amount, frameId) {
+            for (let i = 0; i < amount; i++) {
+                this.windows.push(
+                    PIXI.Sprite.fromFrame(frameId)
+                )
+            }
+        }
+        shuffle(arr) {
+            const len = arr.length
+            const shuffles = len * 3
+            for (let i = 0; i < shuffles; i++) {
+                let wallSlice = arr.pop()
+                let pos = Math.floor(Math.random() * (len - 1))
+                arr.splice(pos, 0, wallSlice)
+            }
+        }
+        createDecorations() {
+            this.decorations = []
+
+            this.addDecorationSprites(6, 'decoration_01')
+            this.addDecorationSprites(6, 'decoration_02')
+            this.addDecorationSprites(6, 'decoration_03')
+
+            this.shuffle(this.decorations)
+        }
+        addDecorationSprites(amount, frameId) {
+            for (let i = 0; i < amount; i++) {
+                this.decorations.push(
+                    PIXI.Sprite.fromFrame(frameId)
+                )
+            }
+        }
+        borrowDecoration() {
+            return this.decorations.shift()
+        }
+        returnDecoration(sprite) {
+            this.decorations.push(sprite)
+        }
+        createHeadEdges() {
+            this.headEdges = []
+
+            this.addHeadEdgeSprite(2, 'edge_01')
+            this.addHeadEdgeSprite(2, 'edge_02')
+
+            this.shuffle(this.headEdges)
+        }
+        createTailEdges() {
+            this.tailEdges = []
+
+            this.addTailEdgeSprite(2, 'edge_01')
+            this.addTailEdgeSprite(2, 'edge_02')
+
+            this.shuffle(this.tailEdges)
+        }
+        addHeadEdgeSprite(amount, frameId) {
+            for (let i = 0; i < amount; i++) {
+                this.headEdges.push(
+                    PIXI.Sprite.fromFrame(frameId)
+                )
+            }
+        }
+        addTailEdgeSprite(amount, frameId) {
+            for (let i = 0; i < amount; i++) {
+                let sprite = PIXI.Sprite.fromFrame(frameId)
+                // 头和尾图片一样，只需要重新设置锚点为最右侧，然后反转（水平横向反缩放）
+                // rotate 做不到的，因为不对称
+                sprite.anchor.x = 1
+                sprite.scale.x = -1
+                this.tailEdges.push(sprite)
+            }
+        }
+        borrowHeadEdge() {
+            return this.headEdges.shift()
+        }
+        returnHeadEdge(sprite) {
+            this.headEdges.push(sprite)
+        }
+        borrowTailEdge() {
+            return this.tailEdges.shift()
+        }
+        returnTailEdge(sprite) {
+            this.tailEdges.push(sprite)
+        }
+        createSteps() {
+            this.steps = []
+            this.addStepSprite(2, 'step_01')
+        }
+        addStepSprite(amount, frameId) {
+            for (let i = 0; i < amount; i++) {
+                let sprite = PIXI.Sprite.fromFrame(frameId)
+                sprite.anchor.y = 0.25
+                this.steps.push(sprite)
+            }
+        }
+        borrowStep() {
+            return this.steps.shift()
+        }
+        returnStep(sprite) {
+            this.steps.push(sprite)
+        }
+    }
+
     class Main {
         static SCROLL_SPEED = 5
         constructor() {
@@ -95,15 +219,103 @@
             this.renderer = PIXI.autoDetectRenderer(512, 384,
                 { view: document.getElementById('game-canvas') }
             )
-
-            this.scroller = new Scroller(this.stage)
-
-            requestAnimationFrame(this.update.bind(this))
+            this.loadSpriteSheet()
         }
         update() {
             this.scroller.moveViewportBy(Main.SCROLL_SPEED)
             this.renderer.render(this.stage)
             requestAnimationFrame(this.update.bind(this))
+        }
+        loadSpriteSheet() {
+            PIXI.loader
+                .add('wall', 'resources/wall.json')
+                .once('complete', this.spriteSheetLoaded.bind(this))
+                .load()
+        }
+        spriteSheetLoaded() {
+            this.scroller = new Scroller(this.stage)
+            requestAnimationFrame(this.update.bind(this))
+
+            this.pool = new WallSpritesPool()
+            this.wallSlices = []
+        }
+        borrowWallSprites(num) {
+            for(let i = 0; i < num; i++) {
+                let sprite = i % 2 === 0
+                    ? this.pool.borrowWindow()
+                    : this.pool.borrowDecoration()
+
+                sprite.position.x = -32 + (i * 64)
+                sprite.position.y = 128
+
+                this.wallSlices.push(sprite)
+                this.stage.addChild(sprite)
+            }
+        }
+        returnWallSprites() {
+            this.wallSlices.forEach((sprite, idx) => {
+                this.stage.removeChild(sprite)
+                if (idx % 2 === 0) {
+                    this.pool.returnWindow(sprite)
+                } else {
+                    this.pool.returnDecoration(sprite)
+                }
+            })
+            this.wallSlices = []
+        }
+        borrowHeadEdge() {
+            return this.headEdges.shift()
+        }
+        returnHeadEdge(sprite) {
+            this.headEdges.push(sprite)
+        }
+        borrowTailEdge() {
+            return this.tailEdges.shift()
+        }
+        returnTailEdge(sprite) {
+            this.tailEdges.push(sprite)
+        }
+        generateTestWallSpan() {
+            let lookupTable = [
+                this.pool.borrowHeadEdge,
+                this.pool.borrowWindow,
+                this.pool.borrowDecoration,
+                this.pool.borrowStep,
+                this.pool.borrowWindow,
+                this.pool.borrowTailEdge,
+            ]
+            let yPos = [
+                128,
+                128,
+                128,
+                192,
+                192,
+                192,
+            ]
+            lookupTable.forEach((item, i) => {
+                let sprite = item.call(this.pool)
+                sprite.position.x = 64 + (i * 64)
+                sprite.position.y = yPos[i]
+
+                this.wallSlices.push(sprite)
+                this.stage.addChild(sprite)
+            })
+        }
+        clearTestWallSpan() {
+            let lookupTable = [
+                this.pool.returnHeadEdge,
+                this.pool.returnWindow,
+                this.pool.returnDecoration,
+                this.pool.returnStep,
+                this.pool.returnWindow,
+                this.pool.returnTailEdge,
+            ]
+            lookupTable.forEach((item, i) => {
+                let sprite = this.wallSlices[i]
+                item.call(this.pool, sprite)
+                this.stage.removeChild(sprite)
+            })
+            this.wallSlices = []
         }
     }
 
